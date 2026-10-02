@@ -1,0 +1,69 @@
+#chat-container {
+  height: 550px;  
+  padding: 20px;
+  overflow-y: auto;
+}
+.message {
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+.message.user {
+  text-align: right;
+}
+.message.user .content-bubble {
+  background-color: #ffffff;
+  color: #2c3e50;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: inline-block;
+  max-width: 85%;
+  text-align: left;
+  white-space: pre-wrap;
+}
+.message.assistant .content-bubble {
+  background-color: #242424;
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: inline-block;
+  max-width: 85%;
+  text-align: left;
+}
+
+/* Estilos para elementos Markdown gerados dentro da bolha da assistente */
+.message.assistant .content-bubble p {
+  margin: 0 0 10px 0;
+}
+.message.assistant .content-bubble p:last-child {
+  margin-bottom: 0;
+}
+.message.assistant .content-bubble ul,
+.message.assistant .content-bubble ol {
+  margin: 5px 0 10px 20px;
+  padding: 0;
+}
+.message.assistant .content-bubble code {
+  background-color: #dcdde1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+.message.assistant .content-bubble pre {
+  background-color: #2f3640;
+  color: #f5f6fa;
+  padding: 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.message.assistant .content-bubble pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+}
+.sources {
+  font-size: 0.85em;
+  color: #7f8c8d;
+  margin-top: 8px;
+  border-left: 3px solid #bdc3c7;
+  padding-left: 8px;
+}
