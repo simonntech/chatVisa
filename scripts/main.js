@@ -10,11 +10,15 @@ const openSidebarBtn = document.getElementById("open-sidebar");
 const closeSidebarBtn = document.getElementById("close-sidebar");
 const historyList = document.getElementById("history-list");
 const newChatBtn = document.getElementById("new-chat-btn");
+const clearAllBtn = document.getElementById("clear-all-btn"); // Novo elemento
 
 let chatHistory = [];
 // Carrega o histórico salvo (se existir)
 let savedSearches = JSON.parse(localStorage.getItem("chatVisaHistory")) || [];
 
+// Eventos do Menu Lateral (Mobile)
+openSidebarBtn.addEventListener("click", () => sidebar.classList.remove("-translate-x-full"));
+closeSidebarBtn.addEventListener("click", () => sidebar.classList.add("-translate-x-full"));
 
 // Botão Nova Consulta
 newChatBtn.addEventListener("click", () => {
@@ -25,18 +29,76 @@ newChatBtn.addEventListener("click", () => {
   if (window.innerWidth < 768) sidebar.classList.add("-translate-x-full");
 });
 
+// Botão Limpar Todo o Histórico
+clearAllBtn.addEventListener("click", () => {
+  if (savedSearches.length === 0) return;
+
+  if (confirm("Tem certeza que deseja apagar todo o histórico de pesquisas?")) {
+    savedSearches = [];
+    localStorage.removeItem("chatVisaHistory");
+    renderHistory();
+    
+    // Reseta a tela atual caso queira voltar para a tela inicial
+    chatContainer.innerHTML = "";
+    chatHistory = [];
+    welcomeScreen.classList.remove("hidden");
+    chatContainer.classList.add("hidden");
+  }
+});
+
 // Renderiza a lista do histórico no menu
 function renderHistory() {
   historyList.innerHTML = "";
-  // Cria uma cópia, inverte (mais recentes no topo) e renderiza
-  [...savedSearches].reverse().forEach((item) => {
+  
+  if (savedSearches.length === 0) {
+    historyList.innerHTML = `<p class="text-xs text-gray-500 text-center py-4">Nenhuma pesquisa salva</p>`;
+    clearAllBtn.classList.add("opacity-50", "cursor-not-allowed");
+    return;
+  }
+
+  clearAllBtn.classList.remove("opacity-50", "cursor-not-allowed");
+
+  // Renderiza do mais recente para o mais antigo
+  savedSearches.slice().reverse().forEach((item, reverseIndex) => {
+    const realIndex = savedSearches.length - 1 - reverseIndex;
+
+    const itemWrapper = document.createElement("div");
+    itemWrapper.className = "group flex items-center justify-between w-full bg-gray-900 hover:bg-gray-700 rounded-lg p-1 transition-colors border border-transparent hover:border-gray-600";
+
     const btn = document.createElement("button");
-    btn.className = "w-full text-left p-3 rounded-lg bg-gray-900 hover:bg-gray-700 transition-colors text-sm truncate text-gray-300 border border-transparent hover:border-gray-500";
+    btn.className = "flex-1 text-left p-2 text-sm truncate text-gray-300 hover:text-white focus:outline-none";
     btn.textContent = item.question;
     btn.title = item.question;
     btn.onclick = () => loadHistoryItem(item);
-    historyList.appendChild(btn);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "text-gray-500 hover:text-red-400 p-2 text-xs transition-colors rounded-md";
+    deleteBtn.title = "Excluir item";
+    deleteBtn.innerHTML = `
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+      </svg>
+    `;
+    deleteBtn.onclick = (e) => {
+      e.stopPropagation();
+      deleteHistoryItem(realIndex);
+    };
+
+    itemWrapper.appendChild(btn);
+    itemWrapper.appendChild(deleteBtn);
+    historyList.appendChild(itemWrapper);
   });
+}
+
+// Remove um item individual do histórico pelo índice
+function deleteHistoryItem(index) {
+  savedSearches.splice(index, 1);
+  if (savedSearches.length === 0) {
+    localStorage.removeItem("chatVisaHistory");
+  } else {
+    localStorage.setItem("chatVisaHistory", JSON.stringify(savedSearches));
+  }
+  renderHistory();
 }
 
 // Carrega uma pergunta/resposta do histórico na tela
@@ -45,24 +107,19 @@ function loadHistoryItem(item) {
   chatContainer.classList.remove("hidden");
   chatContainer.innerHTML = "";
   
-  // Atualiza a memória local da conversa
   chatHistory = [
     { role: "user", content: item.question },
     { role: "assistant", content: item.answer }
   ];
 
-  // Renderiza a pergunta e a resposta salva (com as fontes se houver)
   appendMessage("user", item.question);
   appendMessage("assistant", item.answer, item.sources);
 
-  // Fecha o menu se for versão mobile
   if (window.innerWidth < 768) sidebar.classList.add("-translate-x-full");
 }
 
-// Renderização inicial
 renderHistory();
 
-// Função original (sem alterações)
 function appendMessage(role, text, sources = []) {
   const messageDiv = document.createElement("div");
   messageDiv.className = `message ${role}`;
@@ -96,7 +153,6 @@ function appendMessage(role, text, sources = []) {
   return bubbleDiv;
 }
 
-// Função original com acréscimo da lógica de salvar no localstorage
 async function handleSubmit(e) {
   if (e) e.preventDefault();
   const question = inputField.value.trim();
@@ -159,10 +215,8 @@ async function handleSubmit(e) {
       }
     }
 
-    // Adiciona a resposta completa ao histórico local
     chatHistory.push({ role: "assistant", content: fullAnswer });
 
-    // Salva a busca e as fontes
     savedSearches.push({
       question: question,
       answer: fullAnswer,
