@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat - RAG VISA</title>
+  <!-- Importando Marked.js via CDN para renderizar Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+    }
+    #chat-container {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      height: 600px; /* Aumentado para dar mais espaço */
+      overflow-y: auto;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .message {
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .message.user {
+      text-align: right;
+    }
+    .message.user .content-bubble {
+      background-color: #3498db;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 8px;
+      display: inline-block;
+      max-width: 85%;
+      text-align: left;
+      white-space: pre-wrap;
+    }
+    .message.assistant .content-bubble {
+      background-color: #ecf0f1;
+      color: #2c3e50;
+      padding: 12px 16px;
+      border-radius: 8px;
+      display: inline-block;
+      max-width: 85%;
+      text-align: left;
+    }
+    /* Estilos para elementos Markdown gerados dentro da bolha da assistente */
+    .message.assistant .content-bubble p {
+      margin: 0 0 10px 0;
+    }
+    .message.assistant .content-bubble p:last-child {
+      margin-bottom: 0;
+    }
+    .message.assistant .content-bubble ul, 
+    .message.assistant .content-bubble ol {
+      margin: 5px 0 10px 20px;
+      padding: 0;
+    }
+    .message.assistant .content-bubble code {
+      background-color: #dcdde1;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    .message.assistant .content-bubble pre {
+      background-color: #2f3640;
+      color: #f5f6fa;
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    .message.assistant .content-bubble pre code {
+      background-color: transparent;
+      color: inherit;
+      padding: 0;
+    }
+    .sources {
+      font-size: 0.85em;
+      color: #7f8c8d;
+      margin-top: 8px;
+      background: #fdfdfd;
+      border-left: 3px solid #bdc3c7;
+      padding-left: 8px;
+    }
+    #form {
+      display: flex;
+      gap: 10px;
+    }
+    #input {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1em;
+    }
+    button {
+      padding: 12px 24px;
+      background-color: #2ecc71;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #27ae60;
+    }
+    button:disabled {
+      background-color: #95a5a6;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Assistente RAG - Vigilância Sanitária</h1>
+
+  <div id="chat-container"></div>
+
+  <form id="form">
+    <input type="text" id="input" placeholder="Digite sua dúvida sobre a legislação..." required autocomplete="off">
+    <button type="button" id="send-btn">Enviar</button>
+  </form>
+
+  <script>
+    const chatContainer = document.getElementById('chat-container');
+    const inputField = document.getElementById('input');
+    const sendBtn = document.getElementById('send-btn');
+    const form = document.getElementById('form');
+
+    let chatHistory = [];
+
+    function appendMessage(role, text, sources = []) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${role}`;
+      
+      const bubbleDiv = document.createElement('div');
+      bubbleDiv.className = 'content-bubble';
+
+      if (role === 'user') {
+        bubbleDiv.textContent = text;
+      } else {
+        // Renderiza Markdown para o assistente
+        bubbleDiv.innerHTML = marked.parse(text);
+      }
+
+      messageDiv.appendChild(bubbleDiv);
+
+      if (sources && sources.length > 0) {
+        const sourcesDiv = document.createElement('div');
+        sourcesDiv.className = 'sources';
+        sourcesDiv.innerHTML = '<strong>Fontes:</strong><br>' + sources.map(s => `- ${s.artigo} [${s.fonte}] (${(s.score * 100).toFixed(1)}%)`).join('<br>');
+        messageDiv.appendChild(sourcesDiv);
+      }
+
+      chatContainer.appendChild(messageDiv);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      return bubbleDiv; // Retorna o elemento para atualização em tempo real
+    }
+
+    async function handleSubmit(e) {
+      if (e) e.preventDefault();
+      const question = inputField.value.trim();
+      if (!question) return;
+
+      inputField.value = '';
+      inputField.disabled = true;
+      sendBtn.disabled = true;
+
+      // Adiciona mensagem do usuário na tela e no histórico
+      appendMessage('user', question);
+      chatHistory.push({ role: 'user', content: question });
+
+      // Cria espaço vazio para a resposta da IA preencher via streaming
+      const assistantBubble = appendMessage('assistant', '');
+      let fullAnswer = '';
+      let currentSources = [];
+
+      try {
+        const response = await fetch('http://192.168.110.71:3333/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ history: chatHistory })
+        });
+
+        if (!response.ok) throw new Error('Erro na comunicação com o servidor.');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop(); // Mantém dados incompletos no buffer
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataText = line.replace('data: ', '').trim();
+              if (dataText === '[DONE]') break;
+
+              const data = JSON.parse(dataText);
+              if (data.type === 'chunk') {
+                fullAnswer += data.content;
+                assistantBubble.innerHTML = marked.parse(fullAnswer);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+              } else if (data.type === 'sources') {
+                currentSources = data.sources;
+              } else if (data.type === 'error') {
+                fullAnswer += `\n[Erro: ${data.message}]`;
+                assistantBubble.innerHTML = marked.parse(fullAnswer);
+              }
+            }
+          }
+        }
+
+        // Adiciona a resposta completa da IA ao histórico
+        chatHistory.push({ role: 'assistant', content: fullAnswer });
+
+        // Se houver fontes, exibe abaixo da mensagem do assistente
+        if (currentSources.length > 0) {
+          const parentDiv = assistantBubble.parentElement;
+          const sourcesDiv = document.createElement('div');
+          sourcesDiv.className = 'sources';
+          sourcesDiv.innerHTML = '<strong>Fontes:</strong><br>' + currentSources.map(s => `- ${s.artigo} [${s.fonte}] (${(s.score * 100).toFixed(1)}%)`).join('<br>');
+          parentDiv.appendChild(sourcesDiv);
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+      } catch (error) {
+        console.error(error);
+        assistantBubble.textContent = 'Erro ao conectar com o servidor da API.';
+      } finally {
+        inputField.disabled = false;
+        sendBtn.disabled = false;
+        inputField.focus();
+      }
+    }
+
+    form.addEventListener('submit', handleSubmit);
+    sendBtn.addEventListener('click', handleSubmit);
+  </script>
+
+</body>
+</html>
