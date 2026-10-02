@@ -4,8 +4,65 @@ const inputField = document.getElementById("input");
 const sendBtn = document.getElementById("send-btn");
 const form = document.getElementById("form");
 
-let chatHistory = [];
+// Elementos do Menu Lateral
+const sidebar = document.getElementById("sidebar");
+const openSidebarBtn = document.getElementById("open-sidebar");
+const closeSidebarBtn = document.getElementById("close-sidebar");
+const historyList = document.getElementById("history-list");
+const newChatBtn = document.getElementById("new-chat-btn");
 
+let chatHistory = [];
+// Carrega o histórico salvo (se existir)
+let savedSearches = JSON.parse(localStorage.getItem("chatVisaHistory")) || [];
+
+
+// Botão Nova Consulta
+newChatBtn.addEventListener("click", () => {
+  chatContainer.innerHTML = "";
+  chatHistory = [];
+  welcomeScreen.classList.remove("hidden");
+  chatContainer.classList.add("hidden");
+  if (window.innerWidth < 768) sidebar.classList.add("-translate-x-full");
+});
+
+// Renderiza a lista do histórico no menu
+function renderHistory() {
+  historyList.innerHTML = "";
+  // Cria uma cópia, inverte (mais recentes no topo) e renderiza
+  [...savedSearches].reverse().forEach((item) => {
+    const btn = document.createElement("button");
+    btn.className = "w-full text-left p-3 rounded-lg bg-gray-900 hover:bg-gray-700 transition-colors text-sm truncate text-gray-300 border border-transparent hover:border-gray-500";
+    btn.textContent = item.question;
+    btn.title = item.question;
+    btn.onclick = () => loadHistoryItem(item);
+    historyList.appendChild(btn);
+  });
+}
+
+// Carrega uma pergunta/resposta do histórico na tela
+function loadHistoryItem(item) {
+  welcomeScreen.classList.add("hidden");
+  chatContainer.classList.remove("hidden");
+  chatContainer.innerHTML = "";
+  
+  // Atualiza a memória local da conversa
+  chatHistory = [
+    { role: "user", content: item.question },
+    { role: "assistant", content: item.answer }
+  ];
+
+  // Renderiza a pergunta e a resposta salva (com as fontes se houver)
+  appendMessage("user", item.question);
+  appendMessage("assistant", item.answer, item.sources);
+
+  // Fecha o menu se for versão mobile
+  if (window.innerWidth < 768) sidebar.classList.add("-translate-x-full");
+}
+
+// Renderização inicial
+renderHistory();
+
+// Função original (sem alterações)
 function appendMessage(role, text, sources = []) {
   const messageDiv = document.createElement("div");
   messageDiv.className = `message ${role}`;
@@ -16,7 +73,6 @@ function appendMessage(role, text, sources = []) {
   if (role === "user") {
     bubbleDiv.textContent = text;
   } else {
-    // Renderiza Markdown para o assistente
     bubbleDiv.innerHTML = marked.parse(text);
   }
 
@@ -40,12 +96,12 @@ function appendMessage(role, text, sources = []) {
   return bubbleDiv;
 }
 
+// Função original com acréscimo da lógica de salvar no localstorage
 async function handleSubmit(e) {
   if (e) e.preventDefault();
   const question = inputField.value.trim();
   if (!question) return;
 
-  // Se for a primeira pergunta, oculta a tela de boas-vindas e exibe o container do chat
   if (!welcomeScreen.classList.contains("hidden")) {
     welcomeScreen.classList.add("hidden");
     chatContainer.classList.remove("hidden");
@@ -55,11 +111,9 @@ async function handleSubmit(e) {
   inputField.disabled = true;
   sendBtn.disabled = true;
 
-  // Adiciona mensagem do usuário na tela e no histórico
   appendMessage("user", question);
   chatHistory.push({ role: "user", content: question });
 
-  // Cria espaço vazio para a resposta da IA preencher via streaming
   const assistantBubble = appendMessage("assistant", "");
   let fullAnswer = "";
   let currentSources = [];
@@ -83,7 +137,7 @@ async function handleSubmit(e) {
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n\n");
-      buffer = lines.pop(); // Mantém dados incompletos no buffer
+      buffer = lines.pop(); 
 
       for (const line of lines) {
         if (line.startsWith("data: ")) {
@@ -105,10 +159,18 @@ async function handleSubmit(e) {
       }
     }
 
-    // Adiciona a resposta completa da IA ao histórico
+    // Adiciona a resposta completa ao histórico local
     chatHistory.push({ role: "assistant", content: fullAnswer });
 
-    // Se houver fontes, exibe abaixo da mensagem do assistente
+    // Salva a busca e as fontes
+    savedSearches.push({
+      question: question,
+      answer: fullAnswer,
+      sources: currentSources
+    });
+    localStorage.setItem("chatVisaHistory", JSON.stringify(savedSearches));
+    renderHistory();
+
     if (currentSources.length > 0) {
       const parentDiv = assistantBubble.parentElement;
       const sourcesDiv = document.createElement("div");
