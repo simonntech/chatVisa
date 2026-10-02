@@ -7,53 +7,37 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="styles/localStyles.css" />
-    <link rel="shortcut icon" href="assets/logoChat.png" type="image/x-icon" />
   </head>
-  <!-- Alterado de flex-col para flex (row) para comportar o menu lateral -->
   <body class="bg-gray-900 text-white h-screen flex overflow-hidden">
+    
     <!-- Menu Lateral (Histórico) -->
-    <aside
-      id="sidebar"
-      class="w-72 bg-gray-800 border-r border-gray-700 flex flex-col transition-transform duration-300 transform -translate-x-full md:translate-x-0 absolute md:relative z-50 h-full"
+    <aside 
+      id="sidebar" 
+      class="w-72 bg-gray-800 border-r border-gray-700 flex flex-col transition-all duration-300 z-50 h-full fixed md:relative -translate-x-full md:translate-x-0"
     >
-      <div
-        class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900"
-      >
+      <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900">
         <h2 class="text-xl font-bold">Histórico</h2>
-        <button
-          id="close-sidebar"
-          class="md:hidden text-gray-400 hover:text-white text-3xl leading-none"
-        >
-          &times;
+        <!-- Botão para fechar no mobile / recolher -->
+        <button id="close-sidebar" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+          </svg>
         </button>
       </div>
-      <div class="p-4 border-b border-gray-700 flex flex-col gap-2">
-        <button
-          id="new-chat-btn"
-          class="w-full bg-transparent hover:bg-gray-700 border border-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-        >
-          + Nova Consulta
+      
+      <!-- Botões de Ação no Topo do Menu -->
+      <div class="p-4 border-b border-gray-700 space-y-2">
+        <button id="new-chat-btn" class="w-full bg-transparent hover:bg-gray-700 border border-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+          <span>+</span> Nova Consulta
         </button>
-        <button
-          id="clear-all-btn"
-          class="w-full bg-red-900/40 hover:bg-red-800/60 border border-red-700/60 text-red-300 text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-        >
-          <svg
-            class="w-3.5 h-3.5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-            ></path>
+        <button id="clear-all-btn" class="w-full bg-red-900/40 hover:bg-red-800/60 border border-red-700/60 text-red-300 text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
           </svg>
           Limpar todo o histórico
         </button>
       </div>
+
       <div id="history-list" class="flex-1 overflow-y-auto p-3 space-y-2">
         <!-- Itens do histórico serão inseridos aqui via JS -->
       </div>
@@ -61,60 +45,38 @@
 
     <!-- Área Principal do Chat -->
     <div class="flex-1 flex flex-col h-full w-full relative min-w-0">
-      <header
-        id="header"
-        class="w-full border-b border-gray-800 p-4 bg-gray-900 flex items-center justify-center relative"
-      >
-        <!-- Botão menu hamburguer (Mobile) -->
-        <button
-          id="open-sidebar"
-          class="md:hidden absolute left-4 text-gray-400 hover:text-white"
-        >
-          <svg
-            class="w-8 h-8"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 6h16M4 12h16M4 18h16"
-            ></path>
+      <header id="header" class="w-full border-b border-gray-800 p-4 bg-gray-900 flex items-center justify-center relative">
+        
+        <!-- Botão Toggle Lateral (Visível para abrir/recolher o menu) -->
+        <button id="toggle-sidebar" class="absolute left-4 text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800 transition-colors" title="Alternar Menu Lateral">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-
+        
         <div class="flex items-center gap-3">
           <img
             src="assets/logoChat.png"
             alt="Logo Chat VISA"
-            class="w-16 h-16 sm:w-24 sm:h-24 transition-all"
+            class="w-12 h-12 sm:w-24 sm:h-24 transition-all"
           />
           <div>
-            <h1 class="text-2xl sm:text-4xl font-bold leading-tight">
-              Chat VISA
-            </h1>
-            <p
-              id="header-subtitle"
-              class="text-xs sm:text-sm text-gray-400 hidden sm:block"
-            >
+            <h1 class="text-2xl sm:text-4xl font-bold leading-tight">Chat VISA</h1>
+            <p id="header-subtitle" class="text-xs sm:text-sm text-gray-400 hidden sm:block">
               Assistente Inteligente da Vigilância Sanitária
             </p>
           </div>
         </div>
       </header>
 
-      <main
-        class="flex-1 flex flex-col items-center justify-between overflow-hidden relative max-w-4xl w-full mx-auto px-4"
-      >
+      <main class="flex-1 flex flex-col items-center justify-between overflow-hidden relative max-w-4xl w-full mx-auto px-4">
+        
         <div
           id="welcome-screen"
           class="flex-1 flex flex-col items-center justify-center text-center p-4 transition-all duration-300"
         >
           <p class="text-gray-400 max-w-md">
-            Faça perguntas sobre legislações, normas e condutas da Vigilância
-            Sanitária.
+            Faça perguntas sobre legislações, normas e condutas da Vigilância Sanitária.
           </p>
         </div>
 
@@ -122,12 +84,9 @@
           id="chat-container"
           class="hidden bg-gray-900 flex-1 w-full overflow-y-auto p-4 space-y-4"
         ></div>
-
+        
         <div class="w-full py-4 bg-gray-900">
-          <form
-            id="form"
-            class="flex gap-2 bg-gray-800 p-2 rounded-xl border border-gray-700 focus-within:border-gray-500 mb-4 sm:mb-8"
-          >
+          <form id="form" class="flex gap-2 bg-gray-800 p-2 rounded-xl border border-gray-700 focus-within:border-gray-500 mb-4 sm:mb-8">
             <input
               type="text"
               id="input"

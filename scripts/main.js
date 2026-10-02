@@ -6,19 +6,30 @@ const form = document.getElementById("form");
 
 // Elementos do Menu Lateral
 const sidebar = document.getElementById("sidebar");
-const openSidebarBtn = document.getElementById("open-sidebar");
+const toggleSidebarBtn = document.getElementById("toggle-sidebar");
 const closeSidebarBtn = document.getElementById("close-sidebar");
 const historyList = document.getElementById("history-list");
 const newChatBtn = document.getElementById("new-chat-btn");
-const clearAllBtn = document.getElementById("clear-all-btn"); // Novo elemento
+const clearAllBtn = document.getElementById("clear-all-btn");
 
 let chatHistory = [];
-// Carrega o histórico salvo (se existir)
 let savedSearches = JSON.parse(localStorage.getItem("chatVisaHistory")) || [];
 
-// Eventos do Menu Lateral (Mobile)
-openSidebarBtn.addEventListener("click", () => sidebar.classList.remove("-translate-x-full"));
-closeSidebarBtn.addEventListener("click", () => sidebar.classList.add("-translate-x-full"));
+// Lógica de Esconder/Mostrar o Menu Lateral
+function toggleSidebar() {
+  const isHidden = sidebar.classList.contains("-translate-x-full") || sidebar.classList.contains("md:-ml-72");
+  
+  if (window.innerWidth >= 768) {
+    // Desktop: esconde recolhendo a margem esquerda ou largura
+    sidebar.classList.toggle("md:-ml-72");
+  } else {
+    // Mobile: esconde deslizando para fora da tela
+    sidebar.classList.toggle("-translate-x-full");
+  }
+}
+
+toggleSidebarBtn.addEventListener("click", toggleSidebar);
+closeSidebarBtn.addEventListener("click", toggleSidebar);
 
 // Botão Nova Consulta
 newChatBtn.addEventListener("click", () => {
@@ -26,7 +37,9 @@ newChatBtn.addEventListener("click", () => {
   chatHistory = [];
   welcomeScreen.classList.remove("hidden");
   chatContainer.classList.add("hidden");
-  if (window.innerWidth < 768) sidebar.classList.add("-translate-x-full");
+  if (window.innerWidth < 768) {
+    sidebar.classList.add("-translate-x-full");
+  }
 });
 
 // Botão Limpar Todo o Histórico
@@ -38,7 +51,6 @@ clearAllBtn.addEventListener("click", () => {
     localStorage.removeItem("chatVisaHistory");
     renderHistory();
     
-    // Reseta a tela atual caso queira voltar para a tela inicial
     chatContainer.innerHTML = "";
     chatHistory = [];
     welcomeScreen.classList.remove("hidden");
@@ -58,7 +70,6 @@ function renderHistory() {
 
   clearAllBtn.classList.remove("opacity-50", "cursor-not-allowed");
 
-  // Renderiza do mais recente para o mais antigo
   savedSearches.slice().reverse().forEach((item, reverseIndex) => {
     const realIndex = savedSearches.length - 1 - reverseIndex;
 
@@ -90,7 +101,6 @@ function renderHistory() {
   });
 }
 
-// Remove um item individual do histórico pelo índice
 function deleteHistoryItem(index) {
   savedSearches.splice(index, 1);
   if (savedSearches.length === 0) {
@@ -101,7 +111,6 @@ function deleteHistoryItem(index) {
   renderHistory();
 }
 
-// Carrega uma pergunta/resposta do histórico na tela
 function loadHistoryItem(item) {
   welcomeScreen.classList.add("hidden");
   chatContainer.classList.remove("hidden");
@@ -115,7 +124,9 @@ function loadHistoryItem(item) {
   appendMessage("user", item.question);
   appendMessage("assistant", item.answer, item.sources);
 
-  if (window.innerWidth < 768) sidebar.classList.add("-translate-x-full");
+  if (window.innerWidth < 768) {
+    sidebar.classList.add("-translate-x-full");
+  }
 }
 
 renderHistory();
