@@ -1,69 +1,82 @@
-#chat-container {
-  height: 550px;  
-  padding: 20px;
-  overflow-y: auto;
+/* Custom Scrollbar */
+#chat-container::-webkit-scrollbar {
+  width: 6px;
 }
-.message {
-  margin-bottom: 20px;
-  line-height: 1.6;
-}
-.message.user {
-  text-align: right;
-}
-.message.user .content-bubble {
-  background-color: #ffffff;
-  color: #2c3e50;
-  padding: 10px 14px;
-  border-radius: 8px;
-  display: inline-block;
-  max-width: 85%;
-  text-align: left;
-  white-space: pre-wrap;
-}
-.message.assistant .content-bubble {
-  background-color: #242424;
-  color: #fff;
-  padding: 12px 16px;
-  border-radius: 8px;
-  display: inline-block;
-  max-width: 85%;
-  text-align: left;
+#chat-container::-webkit-scrollbar-thumb {
+  background-color: #374151;
+  border-radius: 4px;
 }
 
-/* Estilos para elementos Markdown gerados dentro da bolha da assistente */
+.message {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.message.user {
+  align-items: flex-end;
+}
+
+.message.user .content-bubble {
+  background-color: #2563eb;
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: 16px 16px 2px 16px;
+  max-width: 80%;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message.assistant {
+  align-items: flex-start;
+}
+
+.message.assistant .content-bubble {
+  background-color: #1f2937;
+  color: #f3f4f6;
+  padding: 12px 16px;
+  border-radius: 16px 16px 16px 2px;
+  max-width: 85%;
+  word-break: break-word;
+}
+
+/* Estilos para elementos Markdown dentro da bolha da assistente */
 .message.assistant .content-bubble p {
-  margin: 0 0 10px 0;
+  margin-bottom: 8px;
 }
 .message.assistant .content-bubble p:last-child {
   margin-bottom: 0;
 }
 .message.assistant .content-bubble ul,
 .message.assistant .content-bubble ol {
-  margin: 5px 0 10px 20px;
+  margin: 8px 0 8px 20px;
   padding: 0;
 }
 .message.assistant .content-bubble code {
-  background-color: #dcdde1;
-  padding: 2px 4px;
+  background-color: #374151;
+  padding: 2px 6px;
   border-radius: 4px;
   font-family: monospace;
+  font-size: 0.9em;
 }
 .message.assistant .content-bubble pre {
-  background-color: #2f3640;
-  color: #f5f6fa;
-  padding: 10px;
-  border-radius: 6px;
+  background-color: #111827;
+  color: #f3f4f6;
+  padding: 12px;
+  border-radius: 8px;
   overflow-x: auto;
+  margin: 8px 0;
 }
 .message.assistant .content-bubble pre code {
   background-color: transparent;
-  color: inherit;
   padding: 0;
 }
+
 .sources {
-  font-size: 0.85em;
-  color: #7f8c8d;
-  margin-top: 8px;
-  border-left: 3px solid #bdc3c7;
+  font-size: 0.8em;
+  color: #9ca3af;
+  margin-top: 6px;
+  border-left: 2px solid #4b5563;
   padding-left: 8px;
 }

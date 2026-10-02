@@ -1,3 +1,4 @@
+const welcomeScreen = document.getElementById("welcome-screen");
 const chatContainer = document.getElementById("chat-container");
 const inputField = document.getElementById("input");
 const sendBtn = document.getElementById("send-btn");
@@ -28,7 +29,7 @@ function appendMessage(role, text, sources = []) {
       "<strong>Fontes:</strong><br>" +
       sources
         .map(
-          (s) => `- ${s.artigo} [${s.fonte}] (${(s.score * 100).toFixed(1)}%)`,
+          (s) => `- ${s.artigo} [${s.fonte}] (${(s.score * 100).toFixed(1)}%)`
         )
         .join("<br>");
     messageDiv.appendChild(sourcesDiv);
@@ -36,14 +37,19 @@ function appendMessage(role, text, sources = []) {
 
   chatContainer.appendChild(messageDiv);
   chatContainer.scrollTop = chatContainer.scrollHeight;
-  return bubbleDiv; 
-  // Retorna o elemento para atualização em tempo real
+  return bubbleDiv;
 }
 
 async function handleSubmit(e) {
   if (e) e.preventDefault();
   const question = inputField.value.trim();
   if (!question) return;
+
+  // Se for a primeira pergunta, oculta a tela de boas-vindas e exibe o container do chat
+  if (!welcomeScreen.classList.contains("hidden")) {
+    welcomeScreen.classList.add("hidden");
+    chatContainer.classList.remove("hidden");
+  }
 
   inputField.value = "";
   inputField.disabled = true;
@@ -112,7 +118,7 @@ async function handleSubmit(e) {
         currentSources
           .map(
             (s) =>
-              `- ${s.artigo} [${s.fonte}] (${(s.score * 100).toFixed(1)}%)`,
+              `- ${s.artigo} [${s.fonte}] (${(s.score * 100).toFixed(1)}%)`
           )
           .join("<br>");
       parentDiv.appendChild(sourcesDiv);
@@ -129,4 +135,3 @@ async function handleSubmit(e) {
 }
 
 form.addEventListener("submit", handleSubmit);
-sendBtn.addEventListener("click", handleSubmit);
