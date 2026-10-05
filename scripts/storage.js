@@ -1,4 +1,5 @@
 const STORAGE_KEY = "chatVisaSessions";
+const MAX_SESSIONS = 20;
 
 export function getSavedChats() {
   return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];

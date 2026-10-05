@@ -100,7 +100,9 @@ async function handleSubmit(e) {
   chatContainer.appendChild(typingIndicator);
   chatContainer.scrollTop = chatContainer.scrollHeight;
 
-  const formattedMessages = chatHistory.map(msg => ({
+  const recentHistory = chatHistory.slice(-MAX_HISTORY_LENGTH);
+
+  const formattedMessages = recentHistory.map(msg => ({
     role: msg.role,
     content: msg.content
   }));
