@@ -12,3 +12,6 @@ export const MAX_HISTORY_LENGTH = 6;
 // Configurações do armazenamento local (LocalStorage)
 export const STORAGE_KEY = "chatVisaSessions";
 export const MAX_SESSIONS = 20; // Limite máximo de sessões armazenadas
+
+// Timeout para inatividade de streaming (tempo sem receber chunks do SSE antes de alertar)
+export const STREAM_TIMEOUT_MS = 30000; // 30 segundos

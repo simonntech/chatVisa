@@ -60,6 +60,14 @@ export function setInputDisabled(disabled) {
 }
 
 /**
+ * Define o valor do campo de entrada
+ * @param {string} value 
+ */
+export function setInputValue(value) {
+  if (inputField) inputField.value = value;
+}
+
+/**
  * Foca o campo de entrada de texto
  */
 export function focusInput() {
@@ -159,6 +167,64 @@ export function appendSources(parentDiv, sources) {
   sourcesDiv.innerHTML = `<strong>Fontes:</strong><br>${sourceItemsHtml}`;
   parentDiv.appendChild(sourcesDiv);
   scrollToBottom();
+}
+
+/**
+ * Exibe um alerta de erro ou de conexão interrompida no chat com opção de retry
+ * @param {HTMLElement} parentContainer - Elemento onde o alerta será inserido (ou o próprio chatContainer)
+ * @param {string} message - Mensagem explicativa
+ * @param {Object} options - { onRetry, type: 'warning' | 'error' }
+ * @returns {HTMLElement}
+ */
+export function appendStreamAlert(parentContainer, message, { onRetry, type = "warning" } = {}) {
+  const container = parentContainer || chatContainer;
+  if (!container) return null;
+
+  const isWarning = type === "warning";
+  const alertDiv = document.createElement("div");
+  alertDiv.className = `stream-alert flex items-start sm:items-center justify-between gap-3 p-3 rounded-xl mt-3 text-xs sm:text-sm border transition-all ${
+    isWarning
+      ? "bg-amber-950/70 border-amber-500/60 text-amber-200"
+      : "bg-red-950/70 border-red-500/60 text-red-200"
+  }`;
+
+  const contentDiv = document.createElement("div");
+  contentDiv.className = "flex items-start sm:items-center gap-2 flex-1";
+
+  // Ícone SVG de alerta/atenção
+  contentDiv.innerHTML = `
+    <svg class="w-5 h-5 shrink-0 ${isWarning ? "text-amber-400" : "text-red-400"}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+    <span class="leading-relaxed">${escapeHtml(message)}</span>
+  `;
+
+  alertDiv.appendChild(contentDiv);
+
+  if (typeof onRetry === "function") {
+    const retryBtn = document.createElement("button");
+    retryBtn.type = "button";
+    retryBtn.className = `shrink-0 px-3 py-1.5 rounded-lg font-medium text-xs transition-colors flex items-center gap-1.5 ${
+      isWarning
+        ? "bg-amber-600 hover:bg-amber-500 text-white"
+        : "bg-red-600 hover:bg-red-500 text-white"
+    }`;
+    retryBtn.innerHTML = `
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+      Tentar novamente
+    `;
+    retryBtn.onclick = () => {
+      alertDiv.remove();
+      onRetry();
+    };
+    alertDiv.appendChild(retryBtn);
+  }
+
+  container.appendChild(alertDiv);
+  scrollToBottom();
+  return alertDiv;
 }
 
 // Renderizador de Markdown com throttling (requestAnimationFrame) para evitar travamentos de tela em streaming

@@ -1,4 +1,4 @@
-import { CHAT_API_URL, MAX_HISTORY_LENGTH } from "./config.js";
+import { CHAT_API_URL, MAX_HISTORY_LENGTH, STREAM_TIMEOUT_MS } from "./config.js";
 import { getSavedChats, saveChats, clearSavedChats, generateChatId } from "./storage.js";
 import { toggleSidebar, closeSidebarMobile, renderHistory } from "./sidebar.js";
 import {
@@ -6,11 +6,13 @@ import {
   showChatContainer,
   clearChatContainer,
   setInputDisabled,
+  setInputValue,
   focusInput,
   showTypingIndicator,
   removeTypingIndicator,
   appendMessage,
   appendSources,
+  appendStreamAlert,
   updateMarkdownThrottled,
   flushMarkdown
 } from "./ui.js";
@@ -28,6 +30,7 @@ let savedChats = getSavedChats();
 let activeChatId = null;
 let chatHistory = [];
 let isStreaming = false;
+let currentAbortController = null;
 
 /**
  * Atualiza a interface da lista lateral de histórico
@@ -43,7 +46,10 @@ function updateHistoryUI() {
  * Inicia uma nova conversa limpa
  */
 function startNewChat() {
-  if (isStreaming) return;
+  if (isStreaming) {
+    if (currentAbortController) currentAbortController.abort();
+    isStreaming = false;
+  }
 
   activeChatId = null;
   chatHistory = [];
@@ -60,7 +66,12 @@ function startNewChat() {
  * @param {Object} chatSession 
  */
 function loadChatSession(chatSession) {
-  if (isStreaming || !chatSession) return;
+  if (isStreaming) {
+    if (currentAbortController) currentAbortController.abort();
+    isStreaming = false;
+  }
+
+  if (!chatSession) return;
 
   activeChatId = chatSession.id;
   chatHistory = Array.isArray(chatSession.messages) ? [...chatSession.messages] : [];
@@ -86,7 +97,10 @@ function loadChatSession(chatSession) {
  * @param {string} chatId 
  */
 function deleteChatSession(chatId) {
-  if (isStreaming && activeChatId === chatId) return;
+  if (isStreaming && activeChatId === chatId) {
+    if (currentAbortController) currentAbortController.abort();
+    isStreaming = false;
+  }
 
   const wasActive = activeChatId === chatId;
 
@@ -109,13 +123,17 @@ function deleteChatSession(chatId) {
  * Limpa todo o histórico de conversas salvas
  */
 function clearAllHistory() {
-  if (isStreaming || savedChats.length === 0) return;
+  if (savedChats.length === 0) return;
 
   const confirmed = window.confirm(
     "Tem certeza que deseja apagar todo o histórico de conversas?"
   );
 
   if (confirmed) {
+    if (isStreaming && currentAbortController) {
+      currentAbortController.abort();
+      isStreaming = false;
+    }
     savedChats = [];
     clearSavedChats();
     startNewChat();
@@ -123,7 +141,18 @@ function clearAllHistory() {
 }
 
 /**
- * Envia uma pergunta para o backend e consome a resposta SSE via streaming
+ * Reenvia uma pergunta após falha ou queda de conexão
+ * @param {string} questionText 
+ */
+function retryQuestion(questionText) {
+  if (!questionText || isStreaming) return;
+  setInputValue(questionText);
+  handleSubmit();
+}
+
+/**
+ * Envia uma pergunta para o backend e consome a resposta SSE via streaming com
+ * proteção ativa contra quedas de rede e instabilidades
  * @param {Event} [e] 
  */
 async function handleSubmit(e) {
@@ -159,18 +188,41 @@ async function handleSubmit(e) {
   let assistantBubble = null;
   let fullAnswer = "";
   let currentSources = [];
-  let hasError = false;
+  let hasServerError = false;
   let isFirstChunk = true;
+  let isStreamDone = false;
+
+  // Gerenciamento de Timeout por inatividade e AbortController para queda de rede
+  const controller = new AbortController();
+  currentAbortController = controller;
+
+  let inactivityTimer = null;
+  const resetInactivityTimer = () => {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      controller.abort(new Error("STREAM_TIMEOUT"));
+    }, STREAM_TIMEOUT_MS);
+  };
+
+  const handleOfflineEvent = () => {
+    controller.abort(new Error("OFFLINE"));
+  };
+
+  window.addEventListener("offline", handleOfflineEvent);
 
   try {
+    // Inicia o timer de inatividade inicial para aguardar o primeiro byte
+    resetInactivityTimer();
+
     const response = await fetch(CHAT_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ history: recentHistory })
+      body: JSON.stringify({ history: recentHistory }),
+      signal: controller.signal
     });
 
     if (response.status === 429) {
-      hasError = true;
+      hasServerError = true;
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || "Muitas requisições. Aguarde um momento.");
     }
@@ -182,11 +234,20 @@ async function handleSubmit(e) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let isStreamDone = false;
 
     while (!isStreamDone) {
       const { value, done } = await reader.read();
-      if (done) break;
+
+      if (done) {
+        // Se o reader terminou mas não recebemos [DONE], houve encerramento prematuro da conexão
+        if (!isStreamDone) {
+          throw new Error("STREAM_INTERRUPTED_PREMATURELY");
+        }
+        break;
+      }
+
+      // Reinicia o timer de inatividade sempre que receber novos dados
+      resetInactivityTimer();
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n\n");
@@ -216,7 +277,7 @@ async function handleSubmit(e) {
           } else if (data.type === "sources") {
             currentSources = Array.isArray(data.sources) ? data.sources : [];
           } else if (data.type === "error") {
-            hasError = true;
+            hasServerError = true;
             if (isFirstChunk) {
               removeTypingIndicator();
               assistantBubble = appendMessage("assistant", "");
@@ -231,20 +292,19 @@ async function handleSubmit(e) {
       }
     }
 
-    // Garante que todo o markdown acumulado seja renderizado de imediato
+    // Finaliza a renderização de qualquer markdown pendente
     if (assistantBubble) {
       flushMarkdown(assistantBubble, fullAnswer);
     }
 
-    // Se houve resposta bem-sucedida, salva no histórico
-    if (!hasError && fullAnswer.trim() !== "") {
+    // Se a resposta foi concluída com sucesso
+    if (!hasServerError && fullAnswer.trim() !== "") {
       chatHistory.push({
         role: "assistant",
         content: fullAnswer,
         sources: currentSources
       });
 
-      // Atualiza ou insere a sessão atual no histórico
       const existingSessionIndex = savedChats.findIndex((chat) => chat.id === activeChatId);
 
       if (existingSessionIndex >= 0) {
@@ -265,21 +325,90 @@ async function handleSubmit(e) {
         appendSources(assistantBubble.parentElement, currentSources);
       }
     } else {
-      // Remove a pergunta não respondida do histórico se falhou
       chatHistory.pop();
     }
   } catch (error) {
-    console.error("❌ Erro durante handleSubmit:", error);
+    console.error("❌ Falha no streaming ou na conexão:", error);
     removeTypingIndicator();
 
-    if (!assistantBubble) {
-      assistantBubble = appendMessage("assistant", "");
+    const parentMessageDiv = assistantBubble ? assistantBubble.parentElement : null;
+
+    // Determina a mensagem de alerta amigável de acordo com o tipo de erro
+    let alertMessage = "Erro ao conectar com o servidor da API.";
+    const isTimeout =
+      error.message === "STREAM_TIMEOUT" ||
+      (controller.signal.aborted && controller.signal.reason?.message === "STREAM_TIMEOUT");
+    const isOffline =
+      error.message === "OFFLINE" ||
+      !navigator.onLine ||
+      (controller.signal.aborted && controller.signal.reason?.message === "OFFLINE");
+    const isInterrupted =
+      error.message === "STREAM_INTERRUPTED_PREMATURELY" ||
+      error.name === "AbortError" ||
+      !isFirstChunk;
+
+    if (isOffline) {
+      alertMessage = "A conexão caiu. Você parece estar sem internet no momento.";
+    } else if (isTimeout) {
+      alertMessage = "A conexão congelou e não recebeu novos dados do servidor (tempo limite excedido).";
+    } else if (isInterrupted) {
+      alertMessage = "A conexão com o servidor caiu durante a geração da resposta. O conteúdo acima pode estar incompleto.";
+    } else if (error.message) {
+      alertMessage = error.message;
     }
-    assistantBubble.textContent =
-      error.message || "Erro ao conectar com o servidor da API.";
-    chatHistory.pop();
+
+    // CENÁRIO 1: A conexão caiu no MEIO da resposta (já existiam dados parciais recebidos)
+    if (!isFirstChunk && assistantBubble) {
+      flushMarkdown(assistantBubble, fullAnswer);
+
+      // Salva a resposta parcial no histórico para não perder o que já foi lido
+      const partialAnswerWithNote = `${fullAnswer}\n\n*(Resposta interrompida por queda de conexão)*`;
+      chatHistory.push({
+        role: "assistant",
+        content: partialAnswerWithNote,
+        sources: currentSources
+      });
+
+      const existingSessionIndex = savedChats.findIndex((chat) => chat.id === activeChatId);
+      if (existingSessionIndex >= 0) {
+        savedChats[existingSessionIndex].messages = [...chatHistory];
+      } else {
+        savedChats.push({
+          id: activeChatId,
+          title: question,
+          createdAt: new Date().toISOString(),
+          messages: [...chatHistory]
+        });
+      }
+      savedChats = saveChats(savedChats);
+      updateHistoryUI();
+
+      // Exibe o alerta visual destacado anexado logo abaixo da resposta incompleta
+      appendStreamAlert(parentMessageDiv, alertMessage, {
+        onRetry: () => retryQuestion(question),
+        type: "warning"
+      });
+    }
+    // CENÁRIO 2: A conexão caiu ANTES de receber qualquer resposta
+    else {
+      chatHistory.pop(); // Remove a pergunta sem resposta do histórico
+
+      if (!assistantBubble) {
+        assistantBubble = appendMessage("assistant", "");
+      }
+      assistantBubble.textContent = "Não foi possível obter uma resposta.";
+
+      appendStreamAlert(assistantBubble.parentElement, alertMessage, {
+        onRetry: () => retryQuestion(question),
+        type: "error"
+      });
+    }
   } finally {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    window.removeEventListener("offline", handleOfflineEvent);
+
     isStreaming = false;
+    currentAbortController = null;
     setInputDisabled(false);
     focusInput();
   }
